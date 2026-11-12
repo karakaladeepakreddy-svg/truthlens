@@ -60,6 +60,60 @@ function RenderRagCard({ rag }: { rag: any }) {
   );
 }
 
+function RenderPretrainedCard({ telemetry }: { telemetry: any }) {
+  if (!telemetry) return null;
+  return (
+    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">🧠</span>
+          <span className="text-xs font-bold text-slate-200">Pretrained PyTorch Model Telemetry</span>
+        </div>
+        <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+          {telemetry.model || 'ResNet-18 Pretrained'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
+        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+          <div className="text-slate-400">Architecture</div>
+          <div className="text-slate-200 font-medium">{telemetry.architecture || 'ResNet-18 (11.7M weights)'}</div>
+        </div>
+        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+          <div className="text-slate-400">Tensor Input</div>
+          <div className="text-sky-400 font-medium">{telemetry.input_tensor_shape || '[1, 3, 224, 224]'}</div>
+        </div>
+        {telemetry.feature_entropy !== undefined && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Logit Entropy</div>
+            <div className="text-emerald-400 font-medium">{telemetry.feature_entropy} nats</div>
+          </div>
+        )}
+        {telemetry.feature_dispersion !== undefined && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Feature Dispersion</div>
+            <div className="text-purple-400 font-medium">{telemetry.feature_dispersion}</div>
+          </div>
+        )}
+        {telemetry.mean_frame_cosine_distance !== undefined && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Mean Cosine Drift</div>
+            <div className="text-sky-400 font-medium">{telemetry.mean_frame_cosine_distance}</div>
+          </div>
+        )}
+        {telemetry.peak_frame_cosine_distance !== undefined && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Peak Cosine Jump</div>
+            <div className={`font-medium ${telemetry.peak_frame_cosine_distance > 0.3 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {telemetry.peak_frame_cosine_distance}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AnalyzePage() {
   const [activeTab, setActiveTab] = useState<TabType>('video');
   const [claimInput, setClaimInput] = useState<string>(
@@ -456,6 +510,9 @@ export default function AnalyzePage() {
 
               {/* RAG Workout Card */}
               <RenderRagCard rag={videoResult?.rag_workout} />
+
+              {/* Pretrained Neural Model Card */}
+              <RenderPretrainedCard telemetry={videoResult?.pretrained_model_telemetry} />
             </div>
           </div>
 
@@ -819,6 +876,9 @@ export default function AnalyzePage() {
 
             {/* RAG Workout Card */}
             <RenderRagCard rag={imageResult?.rag_workout} />
+
+            {/* Pretrained Neural Model Card */}
+            <RenderPretrainedCard telemetry={imageResult?.pretrained_model_telemetry} />
           </div>
 
           <div className="p-6 rounded-2xl glass-panel space-y-5 text-center">
