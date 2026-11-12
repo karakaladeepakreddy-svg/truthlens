@@ -174,3 +174,4 @@ class VisionForensicsDetector:
             "verdict": "MISLEADING_CONTEXT",
             "human_summary": "Archival photograph from August 16, 2018 (Kerala Floods) repurposed with false current claims."
         }
+
