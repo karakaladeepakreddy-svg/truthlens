@@ -132,12 +132,16 @@ export default function AnalyzePage() {
   };
 
   // Trigger Image Detection from Python Backend
-  const triggerImageDetection = async (file?: File, captionOverride?: string) => {
+  const triggerImageDetection = async (file?: File, captionOverride?: string, isScenarioPreset: boolean = false) => {
     setIsLoadingDetection(true);
     try {
       const formData = new FormData();
-      const imgBlob = file || new Blob(['mock image'], { type: 'image/jpeg' });
-      formData.append('file', imgBlob, file ? file.name : 'highway_flood.jpg');
+      if (file) {
+        formData.append('file', file, file.name);
+      } else {
+        const dummyJpg = new Blob(['preset placeholder'], { type: 'image/jpeg' });
+        formData.append('file', dummyJpg, isScenarioPreset ? 'scenario_kerala_floods_2018.jpg' : 'user_sample.jpg');
+      }
       const cap = captionOverride !== undefined ? captionOverride : claimInput;
       if (cap) formData.append('caption', cap);
       const res = await fetch(`${BACKEND_URL}/api/detect/image`, {
@@ -247,7 +251,8 @@ export default function AnalyzePage() {
       triggerAudioDetection();
     } else if (type === 'old_photo') {
       setActiveTab('image');
-      triggerImageDetection();
+      setUploadedImageSrc(null);
+      triggerImageDetection(undefined, undefined, true);
     } else if (type === 'telugu_rumor') {
       setActiveTab('claim');
       setClaimInput('ఉస్మాన్ సాగర్ డ్యామ్ గేట్ కొట్టుకుపోయింది! కాలనీల ప్రజలు వెంటనే ఖాళీ చేయాలని కలెక్టర్ ఆడియో ప్రకటన.');
@@ -269,8 +274,8 @@ export default function AnalyzePage() {
     : 98.8;
 
   // Image evaluation metrics
-  const isImageRecycled = imageResult ? imageResult.is_recycled_media : true;
-  const isImageManipulated = imageResult ? imageResult.is_manipulated : false;
+  const isImageRecycled = imageResult ? Boolean(imageResult.is_recycled_media) : false;
+  const isImageManipulated = imageResult ? Boolean(imageResult.is_manipulated) : false;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -745,47 +750,59 @@ export default function AnalyzePage() {
                   <canvas ref={canvasRef} className={`w-full h-full object-contain ${elaViewMode === 'normal' ? 'block' : 'hidden'}`} />
                   <canvas ref={elaCanvasRef} className={`w-full h-full object-contain ${elaViewMode !== 'normal' ? 'block' : 'hidden'}`} />
                 </>
-              ) : (
+              ) : imageResult?.reverse_archive_match ? (
                 <div className="text-center p-6 space-y-2">
                   <div className="text-5xl">🚗🌊</div>
                   <div className="font-bold text-slate-200 text-sm">
-                    {imageResult?.filename || "Submerged Highway Asset (NH-544 Aluva Bridge)"}
+                    {imageResult.filename || "Submerged Highway Asset (NH-544 Aluva Bridge)"}
                   </div>
                   <div className="text-xs text-amber-400">
                     Circulated Claim: &ldquo;Hyderabad Outer Ring Road flooded this morning!&rdquo;
                   </div>
                 </div>
+              ) : (
+                <div className="text-center p-8 space-y-2">
+                  <div className="text-5xl">📸</div>
+                  <div className="font-bold text-slate-200 text-sm">
+                    Upload Any Custom Image to Analyze
+                  </div>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Click &ldquo;Upload Custom Image&rdquo; above to inspect any photo with PyTorch &amp; ELA, or click &ldquo;🖼️ Recycled Photo&rdquo; preset above to test the 2018 flood case.
+                  </p>
+                </div>
               )}
 
-              <div className="absolute top-4 left-4 bg-slate-900/90 border border-amber-500/40 p-2.5 rounded-lg text-xs space-y-1">
-                <span
-                  className={
-                    isImageRecycled
-                      ? 'text-amber-400 font-bold'
+              {imageResult && (
+                <div className="absolute top-4 left-4 bg-slate-900/90 border border-slate-700 p-2.5 rounded-lg text-xs space-y-1">
+                  <span
+                    className={
+                      isImageRecycled
+                        ? 'text-amber-400 font-bold'
+                        : isImageManipulated
+                        ? 'text-rose-400 font-bold'
+                        : 'text-emerald-400 font-bold'
+                    }
+                  >
+                    {isImageRecycled
+                      ? '⚠️ Recycled Outdated Media (Matched Archive)'
                       : isImageManipulated
-                      ? 'text-rose-400 font-bold'
-                      : 'text-emerald-400 font-bold'
-                  }
-                >
-                  {isImageRecycled
-                    ? '⚠️ Recycled Outdated Media (6+ Years Old)'
-                    : isImageManipulated
-                    ? '🚫 Synthetic/Manipulated Image'
-                    : '✅ Authentic Camera Photography'}
-                </span>
-                <div className="text-slate-300 text-[11px]">
-                  {isImageRecycled
-                    ? `Original: ${imageResult?.reverse_archive_match?.original_event || 'Kerala Floods, August 16, 2018'}`
-                    : `Dimensions: ${imageResult?.dimensions || '1280x720'}`}
+                      ? '🚫 Synthetic/Manipulated Image'
+                      : '✅ Authentic Camera Photography'}
+                  </span>
+                  <div className="text-slate-300 text-[11px]">
+                    {isImageRecycled
+                      ? `Original: ${imageResult?.reverse_archive_match?.original_event || 'Kerala Floods, August 16, 2018'}`
+                      : `Dimensions: ${imageResult?.dimensions || 'Analyzed'}`}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="flex justify-between items-center">
               <button
                 onClick={() => triggerImageDetection()}
                 disabled={isLoadingDetection}
-                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2"
+                className="px-5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2"
               >
                 {isLoadingDetection ? '🔄 Running OpenCV ELA...' : '⚡ Re-Run PyTorch MobileNet & ELA'}
               </button>
@@ -796,7 +813,7 @@ export default function AnalyzePage() {
               <span className="font-bold text-slate-200 text-xs">Forensic Findings:</span>
               <p className="text-xs text-slate-300 leading-relaxed">
                 {imageResult?.human_summary ||
-                  "The image is evaluated for compression Error Level Analysis (ELA) divergence across quadrants, Fourier spectrum power law, and perceptual hashing against historical disaster archives."}
+                  "Upload any image to evaluate compression Error Level Analysis (ELA) divergence across quadrants, Fourier spectrum power law, and perceptual hashing against historical disaster archives."}
               </p>
             </div>
 
@@ -817,7 +834,9 @@ export default function AnalyzePage() {
                   cy="50"
                   r="40"
                   className={`transition-all duration-1000 ease-out ${
-                    isImageRecycled
+                    !imageResult
+                      ? 'stroke-slate-700'
+                      : isImageRecycled
                       ? 'stroke-amber-400'
                       : isImageManipulated
                       ? 'stroke-rose-500'
@@ -826,11 +845,13 @@ export default function AnalyzePage() {
                   strokeWidth="8"
                   strokeDasharray={251.2}
                   strokeDashoffset={
-                    251.2 *
-                    (1 -
-                      (isImageRecycled
-                        ? 0.995
-                        : (imageResult?.deepfake_probability || 14.2) / 100))
+                    !imageResult
+                      ? 0
+                      : 251.2 *
+                        (1 -
+                          (isImageRecycled
+                            ? 0.995
+                            : (imageResult?.authenticity_score || 95.0) / 100))
                   }
                   strokeLinecap="round"
                   fill="transparent"
@@ -838,20 +859,24 @@ export default function AnalyzePage() {
               </svg>
               <div className="absolute flex flex-col items-center">
                 <span className="text-3xl font-extrabold text-white">
-                  {isImageRecycled
+                  {!imageResult
+                    ? '--'
+                    : isImageRecycled
                     ? '99.5%'
-                    : `${imageResult?.authenticity_score || 85.8}%`}
+                    : `${imageResult?.authenticity_score || 95.0}%`}
                 </span>
                 <span
                   className={`text-[10px] font-medium uppercase tracking-wider ${
-                    isImageRecycled
+                    !imageResult
+                      ? 'text-slate-400'
+                      : isImageRecycled
                       ? 'text-amber-400'
                       : isImageManipulated
                       ? 'text-rose-400'
                       : 'text-emerald-400'
                   }`}
                 >
-                  {isImageRecycled ? 'Outdated' : isImageManipulated ? 'Synthetic' : 'Authentic'}
+                  {!imageResult ? 'Ready' : isImageRecycled ? 'Outdated' : isImageManipulated ? 'Synthetic' : 'Authentic'}
                 </span>
               </div>
             </div>
@@ -859,24 +884,30 @@ export default function AnalyzePage() {
             <div className="space-y-1">
               <div
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                  isImageRecycled
+                  !imageResult
+                    ? 'bg-slate-800 text-slate-300 border-slate-700'
+                    : isImageRecycled
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                     : isImageManipulated
                     ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
                     : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                 }`}
               >
-                <span>{isImageRecycled ? '⚠️' : isImageManipulated ? '🚫' : '✅'}</span>
+                <span>{!imageResult ? '📷' : isImageRecycled ? '⚠️' : isImageManipulated ? '🚫' : '✅'}</span>
                 <span>
-                  {isImageRecycled
-                    ? 'Contextual Hijack'
+                  {!imageResult
+                    ? 'Ready for Image Upload'
+                    : isImageRecycled
+                    ? 'Contextual Hijack (2018 Photo)'
                     : isImageManipulated
                     ? 'Manipulated Composite'
-                    : 'Verified Authentic'}
+                    : 'Verified Authentic Image'}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                {isImageRecycled
+                {!imageResult
+                  ? 'Upload any custom picture or select the scenario preset'
+                  : isImageRecycled
                   ? 'Actual raw pixels are authentic; the caption is fabricated'
                   : isImageManipulated
                   ? 'Digital pixel alterations or generative synthesis detected'

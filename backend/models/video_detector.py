@@ -209,3 +209,4 @@ class VideoForensicsDetector:
                 "collapse cascade. Face swap detected on local engineer badge."
             )
         }
+
