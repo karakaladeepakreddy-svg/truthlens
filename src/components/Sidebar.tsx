@@ -7,78 +7,133 @@ interface NavItem {
   name: string;
   href: string;
   icon: string;
+  description: string;
   badge?: string;
   badgeColor?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { name: 'Threat Dashboard', href: '/dashboard', icon: '📊' },
-  { name: 'Media Analysis Studio', href: '/analyze', icon: '🔍', badge: 'AI Live', badgeColor: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40' },
-  { name: 'Network Intelligence', href: '/network', icon: '🕸️', badge: '12 Bots', badgeColor: 'bg-red-500/20 text-red-300 border-red-500/40' },
-  { name: 'Real-Time Stream', href: '/feed', icon: '⚡', badge: 'Live', badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' },
-  { name: 'Forensic Dossiers', href: '/investigations', icon: '📋' },
-  { name: 'Admin & System Config', href: '/admin', icon: '⚙️' },
+  { 
+    name: 'Deepfake Detector', 
+    href: '/analyze', 
+    icon: '🔍', 
+    description: 'Video, audio & image scanner',
+    badge: 'Core', 
+    badgeColor: 'bg-sky-500/10 text-sky-400 border-sky-500/20' 
+  },
+  { 
+    name: 'Incident Dashboard', 
+    href: '/dashboard', 
+    icon: '📊', 
+    description: 'Real-time threat monitoring'
+  },
+  { 
+    name: 'Network Intelligence', 
+    href: '/network', 
+    icon: '🕸️', 
+    description: 'Coordinated bot accounts',
+    badge: '12 Bots', 
+    badgeColor: 'bg-rose-500/10 text-rose-400 border-rose-500/20' 
+  },
+  { 
+    name: 'Live Stream Ingestion', 
+    href: '/feed', 
+    icon: '⚡', 
+    description: 'Social posts & viral claims',
+    badge: 'Live', 
+    badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+  },
+  { 
+    name: 'Forensic Dossiers', 
+    href: '/investigations', 
+    icon: '📋', 
+    description: 'Case evidence & PDF export' 
+  },
+  { 
+    name: 'Settings & Telemetry', 
+    href: '/admin', 
+    icon: '⚙️', 
+    description: 'AI models & API keys' 
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-[#0d1117] border-r border-[#30363d] flex flex-col justify-between shrink-0 select-none min-h-screen">
+    <aside className="w-72 bg-[#0b0f19]/90 backdrop-blur-xl border-r border-slate-800/80 flex flex-col justify-between shrink-0 select-none min-h-screen">
       <div>
         {/* Brand Header */}
-        <div className="p-5 border-b border-[#30363d] flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-violet-600 p-[1px] shadow-lg shadow-cyan-500/20">
-              <div className="w-full h-full bg-[#0a0a0f] rounded-[11px] flex items-center justify-center font-black text-xl text-cyan-400 group-hover:scale-105 transition-transform">
+        <div className="p-5 border-b border-slate-800/80">
+          <Link href="/analyze" className="flex items-center gap-3.5 group">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-600 p-[1.5px] shadow-lg shadow-sky-500/20">
+              <div className="w-full h-full bg-[#0b0f19] rounded-[10px] flex items-center justify-center text-lg group-hover:scale-105 transition-transform">
                 🛡️
               </div>
             </div>
             <div>
-              <div className="font-extrabold text-base tracking-wide bg-gradient-to-r from-cyan-400 via-blue-300 to-indigo-300 bg-clip-text text-transparent">
-                TruthLens
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-base tracking-tight text-white">
+                  TruthLens
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                  AI Verifier
+                </span>
               </div>
-              <div className="text-[10px] font-mono uppercase tracking-widest text-gray-400">
-                WARRIORS · PS11
+              <div className="text-[11px] text-slate-400 font-medium">
+                Deepfake & Misinformation Intelligence
               </div>
             </div>
           </Link>
         </div>
 
-        {/* Live Threat Status Indicator */}
-        <div className="mx-4 mt-4 p-3 rounded-lg bg-[#161b22] border border-red-500/30 flex items-center justify-between shadow-inner">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+        {/* Live Incident Status Pill */}
+        <div className="mx-4 mt-4 p-3 rounded-xl bg-slate-900/80 border border-slate-800/90 shadow-sm space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+              </span>
+              Active Incident Response
             </span>
-            <span className="text-xs font-semibold text-red-300 tracking-wide">THREAT LEVEL: HIGH</span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              High Priority
+            </span>
           </div>
-          <span className="text-[11px] font-mono text-gray-400 bg-red-950/60 px-1.5 py-0.5 rounded border border-red-800/40">
-            DAM CRIME
-          </span>
+          <p className="text-[11px] text-slate-400 leading-tight">
+            Osman Sagar Dam Collapse Rumor & Synthetic Audio Evacuation Call
+          </p>
         </div>
 
         {/* Navigation Links */}
-        <nav className="p-3 space-y-1.5 mt-2">
+        <nav className="p-3 space-y-1 mt-2">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href));
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all group ${
                   isActive
-                    ? 'bg-gradient-to-r from-cyan-950/60 via-[#161b22] to-transparent text-cyan-300 border-l-2 border-cyan-400 shadow-sm'
-                    : 'text-gray-300 hover:text-white hover:bg-[#161b22]/70'
+                    ? 'bg-gradient-to-r from-sky-500/15 via-slate-800/60 to-transparent text-white border-l-2 border-sky-400 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <span className="text-lg">{item.icon}</span>
-                  <span>{item.name}</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-base group-hover:scale-110 transition-transform">{item.icon}</span>
+                  <div className="truncate">
+                    <div className={`text-xs font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                      {item.name}
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate">
+                      {item.description}
+                    </div>
+                  </div>
                 </div>
+
                 {item.badge && (
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${item.badgeColor}`}>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border shrink-0 ${item.badgeColor}`}>
                     {item.badge}
                   </span>
                 )}
@@ -88,20 +143,20 @@ export function Sidebar() {
         </nav>
       </div>
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-[#30363d] bg-[#0a0a0f]/60 space-y-2">
-        <div className="text-[11px] text-gray-400 flex items-center justify-between">
-          <span>Groq Llama-3.3 Engine</span>
-          <span className="text-emerald-400 flex items-center gap-1 font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block"></span>
-            READY
+      {/* Footer System Telemetry */}
+      <div className="p-4 border-t border-slate-800/80 bg-slate-900/40 space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-slate-400">Groq Llama-3.3 Engine</span>
+          <span className="text-emerald-400 font-semibold flex items-center gap-1.5 text-[11px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            Online
           </span>
         </div>
-        <div className="text-[10px] text-gray-500 font-mono">
-          YUKTIK-2026 · CSE(AI&ML) KMIT
+        <div className="text-[10px] text-slate-500 flex items-center justify-between">
+          <span>YUKTIK-2026 · PS11</span>
+          <span className="font-medium text-slate-400">Team WARRIORS</span>
         </div>
       </div>
     </aside>
   );
 }
-
