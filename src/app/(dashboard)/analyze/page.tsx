@@ -67,22 +67,32 @@ function RenderPretrainedCard({ telemetry }: { telemetry: any }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm">🧠</span>
-          <span className="text-xs font-bold text-slate-200">Pretrained PyTorch Model Telemetry</span>
+          <span className="text-xs font-bold text-slate-200">Pretrained AI Model Telemetry</span>
         </div>
         <span className="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
-          {telemetry.model || 'ResNet-18 Pretrained'}
+          {telemetry.model || 'Pretrained Model Active'}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
-          <div className="text-slate-400">Architecture</div>
-          <div className="text-slate-200 font-medium">{telemetry.architecture || 'ResNet-18 (11.7M weights)'}</div>
-        </div>
-        <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
-          <div className="text-slate-400">Tensor Input</div>
-          <div className="text-sky-400 font-medium">{telemetry.input_tensor_shape || '[1, 3, 224, 224]'}</div>
-        </div>
+        {telemetry.architecture && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Architecture</div>
+            <div className="text-slate-200 font-medium truncate">{telemetry.architecture}</div>
+          </div>
+        )}
+        {telemetry.parameters && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Parameters</div>
+            <div className="text-sky-400 font-medium">{telemetry.parameters}</div>
+          </div>
+        )}
+        {telemetry.input_tensor_shape && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Tensor Input</div>
+            <div className="text-sky-400 font-medium">{telemetry.input_tensor_shape}</div>
+          </div>
+        )}
         {telemetry.feature_entropy !== undefined && (
           <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
             <div className="text-slate-400">Logit Entropy</div>
@@ -93,6 +103,20 @@ function RenderPretrainedCard({ telemetry }: { telemetry: any }) {
           <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
             <div className="text-slate-400">Feature Dispersion</div>
             <div className="text-purple-400 font-medium">{telemetry.feature_dispersion}</div>
+          </div>
+        )}
+        {telemetry.spectral_centroid_hz !== undefined && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Spectral Centroid</div>
+            <div className="text-sky-400 font-medium">{telemetry.spectral_centroid_hz} Hz</div>
+          </div>
+        )}
+        {telemetry.vocoder_cutoff_frequency_hz !== undefined && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Vocoder Cutoff</div>
+            <div className={`font-medium ${telemetry.vocoder_cutoff_frequency_hz < 16000 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {telemetry.vocoder_cutoff_frequency_hz} Hz
+            </div>
           </div>
         )}
         {telemetry.mean_frame_cosine_distance !== undefined && (
@@ -107,6 +131,18 @@ function RenderPretrainedCard({ telemetry }: { telemetry: any }) {
             <div className={`font-medium ${telemetry.peak_frame_cosine_distance > 0.3 ? 'text-rose-400' : 'text-emerald-400'}`}>
               {telemetry.peak_frame_cosine_distance}
             </div>
+          </div>
+        )}
+        {telemetry.semantic_vector_alignment && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Semantic Alignment</div>
+            <div className="text-emerald-400 font-medium">{telemetry.semantic_vector_alignment}</div>
+          </div>
+        )}
+        {telemetry.context_window && (
+          <div className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-800">
+            <div className="text-slate-400">Context Window</div>
+            <div className="text-purple-400 font-medium">{telemetry.context_window}</div>
           </div>
         )}
       </div>
@@ -275,18 +311,42 @@ export default function AnalyzePage() {
   const handleVerifyClaim = async () => {
     setIsVerifying(true);
     try {
-      const res = await fetch('/api/groq/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          claim: claimInput,
-          language: selectedLanguage === 'Auto-detect' ? undefined : selectedLanguage,
-          mediaContext: 'Viral social media audio & video compilation',
-          sourceAccount: '@HydCalamityWatch'
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
+      let data = null;
+      try {
+        const beRes = await fetch(`${BACKEND_URL}/api/verify/claim`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            claim: claimInput,
+            language: selectedLanguage === 'Auto-detect' ? undefined : selectedLanguage,
+            media_context: 'Viral social media audio & video compilation',
+            source_account: '@HydCalamityWatch'
+          })
+        });
+        if (beRes.ok) {
+          data = await beRes.json();
+        }
+      } catch (beErr) {
+        console.warn('Backend claim verification fallback:', beErr);
+      }
+
+      if (!data) {
+        const nextRes = await fetch('/api/groq/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            claim: claimInput,
+            language: selectedLanguage === 'Auto-detect' ? undefined : selectedLanguage,
+            mediaContext: 'Viral social media audio & video compilation',
+            sourceAccount: '@HydCalamityWatch'
+          })
+        });
+        if (nextRes.ok) {
+          data = await nextRes.json();
+        }
+      }
+
+      if (data) {
         setGroqResult(data);
       }
     } catch (e) {
@@ -707,6 +767,9 @@ export default function AnalyzePage() {
 
             {/* RAG Workout Card */}
             <RenderRagCard rag={audioResult?.rag_workout} />
+
+            {/* Pretrained Acoustic Model Card */}
+            <RenderPretrainedCard telemetry={audioResult?.pretrained_model_telemetry} />
           </div>
 
           <div className="p-6 rounded-2xl glass-panel space-y-5 text-center">
@@ -1096,19 +1159,30 @@ export default function AnalyzePage() {
                 <div className="space-y-2">
                   <div className="text-xs font-semibold text-slate-300">Government Ground Truth:</div>
                   <div className="grid grid-cols-1 gap-2">
-                    {groqResult.evidenceSources.map((source, idx) => (
-                      <div key={idx} className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="font-semibold text-slate-200">{source.name}</span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 font-medium">
-                            {source.status}
-                          </span>
+                    {groqResult.evidenceSources.map((source: any, idx: number) => {
+                      const name = typeof source === 'string' ? source : (source.name || 'Official Ground Truth Source');
+                      const status = typeof source === 'string' ? 'Refutes' : (source.status || 'Refutes');
+                      const snippet = typeof source === 'string' ? source : (source.snippet || source.name);
+                      const isRefuting = status === 'Refutes' || status === 'CONTRADICTED';
+                      return (
+                        <div key={idx} className="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800 text-xs">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-semibold text-slate-200">{name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-medium ${
+                              isRefuting ? 'bg-rose-950 text-rose-400' : 'bg-emerald-950 text-emerald-400'
+                            }`}>
+                              {status}
+                            </span>
+                          </div>
+                          <p className="text-slate-400 text-[11px] leading-relaxed">{snippet}</p>
                         </div>
-                        <p className="text-slate-400 text-[11px] leading-relaxed">{source.snippet}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
+
+                {/* Pretrained Transformer Model Telemetry */}
+                <RenderPretrainedCard telemetry={(groqResult as any)?.pretrained_model_telemetry} />
               </div>
             ) : (
               <div className="h-64 flex flex-col items-center justify-center text-center p-6 border-2 border-dashed border-slate-800 rounded-xl text-slate-400 space-y-2">

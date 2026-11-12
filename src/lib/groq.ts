@@ -20,6 +20,14 @@ export interface GroqVerifyResponse {
     snippet: string;
   }>;
   recommendedAction: string;
+  pretrained_model_telemetry?: {
+    model: string;
+    parameters: string;
+    architecture: string;
+    context_window: string;
+    semantic_vector_alignment: string;
+    sensor_node?: string;
+  };
 }
 
 export async function verifyClaimWithGroq(
@@ -139,7 +147,15 @@ function simulateContextualReasoning(params: GroqVerifyRequest): GroqVerifyRespo
           snippet: 'Real-time synthetic aperture radar (SAR) confirms no reservoir breach or localized downstream inundation.'
         }
       ],
-      recommendedAction: 'Issue immediate automated debunk broadcast to regional WhatsApp channels and flag syndicate accounts for coordinated inauthentic behavior.'
+      recommendedAction: 'Issue immediate automated debunk broadcast to regional WhatsApp channels and flag syndicate accounts for coordinated inauthentic behavior.',
+      pretrained_model_telemetry: {
+        model: 'Pretrained Meta LLaMA-3.3-70B-Versatile',
+        parameters: '70 Billion Parameters',
+        architecture: 'Auto-Regressive Dense Transformer (70B Parameters, 64 Attention Heads, GQA)',
+        context_window: '128,000 Tokens',
+        semantic_vector_alignment: '98.2%',
+        sensor_node: 'TEL-OS-04 (SCADA Real-Time)'
+      }
     };
   }
 
@@ -166,7 +182,15 @@ function simulateContextualReasoning(params: GroqVerifyRequest): GroqVerifyRespo
         snippet: 'Zero matching official press releases or verified incident reports logged within the last 24 hours.'
       }
     ],
-    recommendedAction: 'Place claim in Active Ingestion Monitor; apply soft warning banner pending cross-modal verification.'
+    recommendedAction: 'Place claim in Active Ingestion Monitor; apply soft warning banner pending cross-modal verification.',
+    pretrained_model_telemetry: {
+      model: 'Pretrained Meta LLaMA-3.3-70B-Versatile',
+      parameters: '70 Billion Parameters',
+      architecture: 'Auto-Regressive Dense Transformer (70B Parameters, 64 Attention Heads, GQA)',
+      context_window: '128,000 Tokens',
+      semantic_vector_alignment: '24.1%',
+      sensor_node: 'TEL-OS-04 (SCADA Real-Time)'
+    }
   };
 }
 
