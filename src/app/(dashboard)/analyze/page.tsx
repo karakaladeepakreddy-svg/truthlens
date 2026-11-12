@@ -7,6 +7,59 @@ type TabType = 'video' | 'audio' | 'image' | 'claim';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
+function RenderRagCard({ rag }: { rag: any }) {
+  if (!rag) return null;
+  const isContradicted = rag.rag_verdict === 'CONTRADICTED';
+  return (
+    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm">⚖️</span>
+          <span className="text-xs font-bold text-slate-200">RAG Ground-Truth Corroboration</span>
+        </div>
+        <span
+          className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+            isContradicted
+              ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+          }`}
+        >
+          {rag.rag_verdict} ({rag.rag_confidence}%)
+        </span>
+      </div>
+
+      {rag.sensor_corroboration && (
+        <div className="p-3 rounded-lg bg-slate-950/90 border border-slate-800 text-[11px] space-y-1">
+          <div className="flex justify-between text-slate-400 font-mono">
+            <span>Sensor: {rag.sensor_corroboration.sensor_node}</span>
+            <span className={isContradicted ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
+              {rag.sensor_corroboration.status}
+            </span>
+          </div>
+          <div className="text-slate-200">
+            Reading: <span className="text-sky-300 font-medium">{rag.sensor_corroboration.physical_reading}</span>
+          </div>
+        </div>
+      )}
+
+      {rag.reasoning_steps && (
+        <div className="space-y-1.5 text-[11px] text-slate-300">
+          {rag.reasoning_steps.map((step: string, idx: number) => (
+            <div key={idx} className="flex items-start gap-1.5">
+              <span className="text-sky-400 font-bold">›</span>
+              <span className="leading-relaxed">{step}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="text-[10px] text-slate-400 font-mono pt-1 border-t border-slate-800/80">
+        Authority: {rag.authoritative_citation}
+      </div>
+    </div>
+  );
+}
+
 export default function AnalyzePage() {
   const [activeTab, setActiveTab] = useState<TabType>('video');
   const [claimInput, setClaimInput] = useState<string>(
@@ -32,14 +85,16 @@ export default function AnalyzePage() {
   const elaCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Trigger Video Detection from Python Backend
-  const triggerVideoDetection = async (file?: File) => {
+  const triggerVideoDetection = async (file?: File, captionOverride?: string) => {
     setIsLoadingDetection(true);
     try {
       const formData = new FormData();
       if (file) formData.append('file', file);
+      const cap = captionOverride !== undefined ? captionOverride : claimInput;
+      if (cap) formData.append('caption', cap);
       const res = await fetch(`${BACKEND_URL}/api/detect/video`, {
         method: 'POST',
-        body: file ? formData : undefined
+        body: formData
       });
       if (res.ok) {
         const data = await res.json();
@@ -53,12 +108,14 @@ export default function AnalyzePage() {
   };
 
   // Trigger Audio Detection from Python Backend
-  const triggerAudioDetection = async (file?: File) => {
+  const triggerAudioDetection = async (file?: File, captionOverride?: string) => {
     setIsLoadingDetection(true);
     try {
       const formData = new FormData();
       const audioBlob = file || new Blob(['mock audio sample'], { type: 'audio/ogg' });
       formData.append('file', audioBlob, file ? file.name : 'collector_evacuation_order.ogg');
+      const cap = captionOverride !== undefined ? captionOverride : claimInput;
+      if (cap) formData.append('caption', cap);
       const res = await fetch(`${BACKEND_URL}/api/detect/audio`, {
         method: 'POST',
         body: formData
@@ -75,12 +132,14 @@ export default function AnalyzePage() {
   };
 
   // Trigger Image Detection from Python Backend
-  const triggerImageDetection = async (file?: File) => {
+  const triggerImageDetection = async (file?: File, captionOverride?: string) => {
     setIsLoadingDetection(true);
     try {
       const formData = new FormData();
       const imgBlob = file || new Blob(['mock image'], { type: 'image/jpeg' });
       formData.append('file', imgBlob, file ? file.name : 'highway_flood.jpg');
+      const cap = captionOverride !== undefined ? captionOverride : claimInput;
+      if (cap) formData.append('caption', cap);
       const res = await fetch(`${BACKEND_URL}/api/detect/image`, {
         method: 'POST',
         body: formData
@@ -101,7 +160,42 @@ export default function AnalyzePage() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setUploadedImageSrc(url);
-    triggerImageDetection(file);
+
+    // Render image to canvas and generate visual ELA simulation
+    const img = new Image();
+    img.src = url;
+    img.onload = () => {
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        canvasRef.current.width = img.width;
+        canvasRef.current.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+      }
+      if (elaCanvasRef.current) {
+        const ctx = elaCanvasRef.current.getContext('2d');
+        elaCanvasRef.current.width = img.width;
+        elaCanvasRef.current.height = img.height;
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imgData = ctx.getImageData(0, 0, img.width, img.height);
+          const data = imgData.data;
+          // Apply high-contrast forensic ELA visualization
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            const highFreq = Math.abs(r - g) * 8 + Math.abs(g - b) * 8;
+            data[i] = Math.min(255, highFreq * 1.5);
+            data[i + 1] = Math.min(255, lum * 0.3);
+            data[i + 2] = Math.min(255, 120 + highFreq * 0.5);
+          }
+          ctx.putImageData(imgData, 0, 0);
+        }
+      }
+    };
+
+    triggerImageDetection(file, claimInput);
   };
 
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,7 +203,7 @@ export default function AnalyzePage() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setUploadedAudioSrc(url);
-    triggerAudioDetection(file);
+    triggerAudioDetection(file, claimInput);
   };
 
   const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,7 +211,7 @@ export default function AnalyzePage() {
     if (!file) return;
     const url = URL.createObjectURL(file);
     setUploadedVideoSrc(url);
-    triggerVideoDetection(file);
+    triggerVideoDetection(file, claimInput);
   };
 
   const handleVerifyClaim = async () => {
@@ -162,6 +256,22 @@ export default function AnalyzePage() {
     }
   };
 
+  // Video evaluation metrics
+  const isVideoManipulated = videoResult ? videoResult.is_manipulated : true;
+  const videoScore = videoResult
+    ? (isVideoManipulated ? videoResult.deepfake_probability : videoResult.authenticity_score)
+    : 94.8;
+
+  // Audio evaluation metrics
+  const isAudioSynthetic = audioResult ? audioResult.is_synthetic_speech : true;
+  const audioScore = audioResult
+    ? (isAudioSynthetic ? audioResult.voice_clone_probability : audioResult.authenticity_score)
+    : 98.8;
+
+  // Image evaluation metrics
+  const isImageRecycled = imageResult ? imageResult.is_recycled_media : true;
+  const isImageManipulated = imageResult ? imageResult.is_manipulated : false;
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Human-Centered Header: TruthScan style */}
@@ -176,7 +286,8 @@ export default function AnalyzePage() {
               Is this content authentic or synthetic?
             </h1>
             <p className="text-sm text-slate-300 max-w-3xl leading-relaxed">
-              Analyze videos, voice recordings, photographs, or news claims to detect AI deepfakes, voice cloning, recycled archival footage, and coordinated disinformation campaigns.
+              Upload custom images, videos, audio notes, or claims. TruthLens runs pretrained PyTorch & OpenCV models,
+              Error Level Analysis (ELA), optical flow temporal forensics, and RAG ground-truth sensor corroboration.
             </p>
           </div>
 
@@ -210,6 +321,31 @@ export default function AnalyzePage() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Global Context / Caption Input for RAG Grounding */}
+        <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 flex flex-col md:flex-row items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0 text-xs text-sky-400 font-bold">
+            <span>⚖️ RAG Context / Claim:</span>
+          </div>
+          <input
+            type="text"
+            value={claimInput}
+            onChange={(e) => setClaimInput(e.target.value)}
+            placeholder="Type or paste the claim associated with your media (e.g., 'Osman Sagar dam broken')..."
+            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-sky-400"
+          />
+          <button
+            onClick={() => {
+              if (activeTab === 'video') triggerVideoDetection(undefined, claimInput);
+              if (activeTab === 'audio') triggerAudioDetection(undefined, claimInput);
+              if (activeTab === 'image') triggerImageDetection(undefined, claimInput);
+              if (activeTab === 'claim') handleVerifyClaim();
+            }}
+            className="px-4 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs shrink-0 transition-all"
+          >
+            Update RAG
+          </button>
         </div>
 
         {/* Tab Navigation */}
@@ -247,38 +383,46 @@ export default function AnalyzePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-bold text-base text-white">Video Asset Inspection</h3>
-                  <p className="text-xs text-slate-400">Tested via Vision Transformer (ViT) & Temporal Flow in Python Backend</p>
+                  <p className="text-xs text-slate-400">Tested via Pretrained PyTorch & Optical Flow in Python Backend</p>
                 </div>
 
                 <label className="px-3.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-sky-400 text-slate-200 text-xs font-medium cursor-pointer flex items-center gap-2 transition-all">
                   <span>📁</span>
-                  <span>Upload Video File</span>
+                  <span>Upload Custom Video</span>
                   <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
                 </label>
               </div>
 
               {/* Video Player Display */}
-              <div className="relative aspect-video rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex flex-col items-center justify-center text-center p-6 shadow-inner">
-                <div className="space-y-3 z-10">
-                  <div className="text-5xl">🌊</div>
-                  <div className="font-bold text-slate-200 text-base">
-                    Osman Sagar Spillway Breach (12s Clip)
+              <div className="relative aspect-video rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex flex-col items-center justify-center text-center p-2 shadow-inner">
+                {uploadedVideoSrc ? (
+                  <video src={uploadedVideoSrc} controls className="w-full h-full object-contain" />
+                ) : (
+                  <div className="space-y-3 z-10 p-6">
+                    <div className="text-5xl">🌊</div>
+                    <div className="font-bold text-slate-200 text-base">
+                      {videoResult?.filename || "Osman Sagar Spillway Breach (12s Clip)"}
+                    </div>
+                    <div className="text-xs text-slate-400 max-w-md">
+                      Claimed: &ldquo;Main dam crest gate cracked this morning! Water rushing into lower colonies.&rdquo;
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-400 max-w-md">
-                    Claimed: &ldquo;Main dam crest gate cracked this morning! Water rushing into lower colonies.&rdquo;
-                  </div>
-                </div>
+                )}
 
-                <div className="absolute top-4 left-4 flex flex-col gap-1.5">
-                  <span className="px-2.5 py-1 rounded-md bg-rose-500/90 text-white text-xs font-bold shadow-md">
-                    ⚠️ Temporal Flow Anomaly (Gate #3)
+                <div className="absolute top-4 left-4 flex flex-col gap-1.5 pointer-events-none">
+                  <span
+                    className={`px-2.5 py-1 rounded-md text-white text-xs font-bold shadow-md ${
+                      isVideoManipulated ? 'bg-rose-500/90' : 'bg-emerald-500/90'
+                    }`}
+                  >
+                    {isVideoManipulated ? '⚠️ Temporal Flow Anomaly' : '✅ Continuous Optical Flow'}
                   </span>
                   <span className="px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-700 text-slate-200 text-[11px] font-mono">
-                    Frame #142 | 0:04 - 0:09
+                    {videoResult?.resolution || '1920x1080'} · {videoResult?.fps || '30'} fps · {videoResult?.frames_analyzed || '16'} Frames
                   </span>
                 </div>
 
-                <div className="absolute bottom-4 right-4 bg-slate-900/90 border border-slate-700 px-3 py-1 rounded-md text-[11px] font-mono text-sky-400">
+                <div className="absolute bottom-4 right-4 bg-slate-900/90 border border-slate-700 px-3 py-1 rounded-md text-[11px] font-mono text-sky-400 pointer-events-none">
                   Backend API: /api/detect/video
                 </div>
               </div>
@@ -289,7 +433,7 @@ export default function AnalyzePage() {
                   disabled={isLoadingDetection}
                   className="px-5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2"
                 >
-                  {isLoadingDetection ? '🔄 Running Python ViT Model...' : '⚡ Re-Run PyTorch ViT Detection'}
+                  {isLoadingDetection ? '🔄 Running Python Forensics...' : '⚡ Re-Run PyTorch Video Detection'}
                 </button>
                 <span className="text-xs text-slate-400">Processed by Python backend (Torch + OpenCV)</span>
               </div>
@@ -297,13 +441,16 @@ export default function AnalyzePage() {
               <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
                   <span>💡</span>
-                  <span>Human-Readable Explanation</span>
+                  <span>Forensic Explanation</span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   {videoResult?.human_summary ||
-                    "Our system discovered that this video is a composite fabrication. The base footage was recorded on July 26, 2021 during normal, controlled reservoir operations. An adversarial generative model (GAN) synthetically added a collapsing concrete barrier and turbulent water surge to simulate a breach."}
+                    "Our system analyzed video keyframes for optical flow shear and synthetic generative artifacts. Pretrained models assess facial boundary stability, temporal continuity, and background consistency."}
                 </p>
               </div>
+
+              {/* RAG Workout Card */}
+              <RenderRagCard rag={videoResult?.rag_workout} />
             </div>
           </div>
 
@@ -321,50 +468,76 @@ export default function AnalyzePage() {
                     cx="50"
                     cy="50"
                     r="40"
-                    className="stroke-rose-500 transition-all duration-1000 ease-out"
+                    className={`transition-all duration-1000 ease-out ${
+                      isVideoManipulated ? 'stroke-rose-500' : 'stroke-emerald-400'
+                    }`}
                     strokeWidth="8"
                     strokeDasharray={251.2}
-                    strokeDashoffset={251.2 * (1 - (videoResult?.deepfake_probability || 94.8) / 100)}
+                    strokeDashoffset={251.2 * (1 - videoScore / 100)}
                     strokeLinecap="round"
                     fill="transparent"
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center">
-                  <span className="text-3xl font-extrabold text-white">
-                    {videoResult?.deepfake_probability || 94.8}%
-                  </span>
-                  <span className="text-[10px] font-medium text-rose-400 uppercase tracking-wider">
-                    Synthetic
+                  <span className="text-3xl font-extrabold text-white">{videoScore}%</span>
+                  <span
+                    className={`text-[10px] font-medium uppercase tracking-wider ${
+                      isVideoManipulated ? 'text-rose-400' : 'text-emerald-400'
+                    }`}
+                  >
+                    {isVideoManipulated ? 'Synthetic' : 'Authentic'}
                   </span>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold">
-                  <span>🚫</span>
+                <div
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                    isVideoManipulated
+                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                  }`}
+                >
+                  <span>{isVideoManipulated ? '🚫' : '✅'}</span>
                   <span>{videoResult?.verdict || 'Manipulated Deepfake'}</span>
                 </div>
                 <p className="text-xs text-slate-400">
-                  High probability of synthetic manipulation
+                  {isVideoManipulated
+                    ? 'High probability of synthetic manipulation'
+                    : 'Consistent temporal flow & authentic camera optics'}
                 </p>
               </div>
 
               <div className="space-y-2.5 text-left border-t border-slate-800/80 pt-4 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">GAN Cascade Artifacts:</span>
-                  <span className="font-semibold text-rose-400">96.8% detected</span>
+                  <span className="text-slate-400">Optical Flow Shear Ratio:</span>
+                  <span
+                    className={`font-semibold ${
+                      isVideoManipulated ? 'text-rose-400' : 'text-emerald-400'
+                    }`}
+                  >
+                    {videoResult?.anomaly_details?.optical_flow_shear_ratio || 96.8}%
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Face-Swap on Engineer:</span>
-                  <span className="font-semibold text-rose-400">96.2% detected</span>
+                  <span className="text-slate-400">Face Stability Score:</span>
+                  <span
+                    className={`font-semibold ${
+                      isVideoManipulated ? 'text-rose-400' : 'text-emerald-400'
+                    }`}
+                  >
+                    {videoResult?.anomaly_details?.face_stability_score || 95.0}%
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Archival Video Match:</span>
-                  <span className="font-semibold text-sky-400">July 2021 (YouTube)</span>
+                  <span className="text-slate-400">Spectral Residual Ratio:</span>
+                  <span className="font-semibold text-sky-400">
+                    {videoResult?.anomaly_details?.spectral_residual_ratio || 1.14}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Dam Structural Sensor:</span>
-                  <span className="font-semibold text-emerald-400">Safe (TG-SDMA)</span>
+                  <span className="font-semibold text-emerald-400">Safe (1,788.2 ft)</span>
                 </div>
               </div>
             </div>
@@ -384,7 +557,7 @@ export default function AnalyzePage() {
 
               <label className="px-3.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-rose-400 text-slate-200 text-xs font-medium cursor-pointer flex items-center gap-2 transition-all">
                 <span>📁</span>
-                <span>Upload Voice Clip</span>
+                <span>Upload Custom Voice Clip</span>
                 <input type="file" accept="audio/*" onChange={handleAudioUpload} className="hidden" />
               </label>
             </div>
@@ -392,7 +565,11 @@ export default function AnalyzePage() {
             <div className="p-5 rounded-xl bg-slate-950 border border-slate-800 space-y-4">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                      isAudioSynthetic ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'
+                    }`}
+                  >
                     ▶
                   </div>
                   <div>
@@ -400,21 +577,31 @@ export default function AnalyzePage() {
                       {audioResult?.filename || 'Emergency_Evacuation_Collector_Order.ogg'}
                     </div>
                     <div className="text-[11px] text-slate-400">
-                      {audioResult?.duration_seconds || 28.0} seconds · WhatsApp Forward
+                      {audioResult?.duration_seconds || 28.0} seconds · Acoustic Spectrogram
                     </div>
                   </div>
                 </div>
-                <span className="text-xs font-mono text-rose-400 bg-rose-950/60 px-2 py-0.5 rounded border border-rose-800/40">
+                <span
+                  className={`text-xs font-mono px-2 py-0.5 rounded border ${
+                    isAudioSynthetic
+                      ? 'text-rose-400 bg-rose-950/60 border-rose-800/40'
+                      : 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+                  }`}
+                >
                   {audioResult?.vocoder_artifacts?.cutoff_frequency_hz || 14520} Hz Cutoff
                 </span>
               </div>
+
+              {uploadedAudioSrc && (
+                <audio src={uploadedAudioSrc} controls className="w-full mt-2" />
+              )}
 
               <div className="flex items-center justify-center gap-1 h-24 px-2 bg-slate-900/60 rounded-lg">
                 {[45, 60, 85, 90, 40, 75, 95, 80, 60, 85, 90, 70, 40, 75, 95, 85, 55, 70, 85, 40, 65, 90, 50, 75, 85, 40].map((h, i) => (
                   <div
                     key={i}
                     className={`w-2 rounded-full transition-all duration-300 ${
-                      i > 16 ? 'bg-rose-500' : 'bg-sky-400'
+                      isAudioSynthetic && i > 16 ? 'bg-rose-500' : 'bg-sky-400'
                     }`}
                     style={{ height: `${h}%` }}
                   ></div>
@@ -422,9 +609,11 @@ export default function AnalyzePage() {
               </div>
 
               <div className="flex justify-between text-[11px] font-mono text-slate-400">
-                <span>00:00 (Natural speech profile)</span>
-                <span className="text-rose-400">⚠️ Artificial speech harmonics detected</span>
-                <span>00:28 (End)</span>
+                <span>00:00 (Acoustic profile)</span>
+                <span className={isAudioSynthetic ? 'text-rose-400' : 'text-emerald-400'}>
+                  {isAudioSynthetic ? '⚠️ Artificial speech harmonics detected' : '✅ Natural respiratory breathing harmonics'}
+                </span>
+                <span>{audioResult?.duration_seconds || 28.0}s</span>
               </div>
             </div>
 
@@ -441,18 +630,21 @@ export default function AnalyzePage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
               <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                <span className="font-semibold text-slate-200">Target Voice Mimicked:</span>
+                <span className="font-semibold text-slate-200">Speaker Profile Identification:</span>
                 <p className="text-slate-400">
                   {audioResult?.speaker_identification?.matched_profile || "District Collector (IAS) Public Speech Profile"}. Match is <strong>{audioResult?.speaker_identification?.timbre_similarity || "98.4%"}</strong>.
                 </p>
               </div>
               <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
-                <span className="font-semibold text-slate-200">Why it was flagged:</span>
+                <span className="font-semibold text-slate-200">Forensic Analysis:</span>
                 <p className="text-slate-400">
-                  Total absence of natural breath intakes, robotic consistency, and studio silence artifacts.
+                  {audioResult?.human_summary || "Audio checked for vocoder cutoff above 14.5 kHz and natural respiratory breathing cadence."}
                 </p>
               </div>
             </div>
+
+            {/* RAG Workout Card */}
+            <RenderRagCard rag={audioResult?.rag_workout} />
           </div>
 
           <div className="p-6 rounded-2xl glass-panel space-y-5 text-center">
@@ -467,31 +659,43 @@ export default function AnalyzePage() {
                   cx="50"
                   cy="50"
                   r="40"
-                  className="stroke-rose-500"
+                  className={`transition-all duration-1000 ease-out ${
+                    isAudioSynthetic ? 'stroke-rose-500' : 'stroke-emerald-400'
+                  }`}
                   strokeWidth="8"
                   strokeDasharray={251.2}
-                  strokeDashoffset={251.2 * (1 - (audioResult?.voice_clone_probability || 99.1) / 100)}
+                  strokeDashoffset={251.2 * (1 - audioScore / 100)}
                   strokeLinecap="round"
                   fill="transparent"
                 />
               </svg>
               <div className="absolute flex flex-col items-center">
-                <span className="text-3xl font-extrabold text-white">
-                  {audioResult?.voice_clone_probability || 99.1}%
-                </span>
-                <span className="text-[10px] font-medium text-rose-400 uppercase tracking-wider">
-                  Cloned Voice
+                <span className="text-3xl font-extrabold text-white">{audioScore}%</span>
+                <span
+                  className={`text-[10px] font-medium uppercase tracking-wider ${
+                    isAudioSynthetic ? 'text-rose-400' : 'text-emerald-400'
+                  }`}
+                >
+                  {isAudioSynthetic ? 'Cloned Voice' : 'Authentic Speech'}
                 </span>
               </div>
             </div>
 
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-bold">
-                <span>🚫</span>
-                <span>Fabricated Audio Order</span>
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                  isAudioSynthetic
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                }`}
+              >
+                <span>{isAudioSynthetic ? '🚫' : '✅'}</span>
+                <span>{audioResult?.verdict || 'Fabricated Audio Order'}</span>
               </div>
               <p className="text-xs text-slate-400">
-                Collectorate issued official denial at 10:07 AM
+                {isAudioSynthetic
+                  ? 'Collectorate issued official denial of evacuation'
+                  : 'Genuine human vocal harmonics confirmed'}
               </p>
             </div>
           </div>
@@ -505,7 +709,7 @@ export default function AnalyzePage() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-base text-white">Image Forensics & Error Level Analysis (ELA)</h3>
-                <p className="text-xs text-slate-400">Processed by Python OpenCV & pHash Engine on Port 8000</p>
+                <p className="text-xs text-slate-400">Processed by Pretrained PyTorch MobileNetV2 & OpenCV on Port 8000</p>
               </div>
 
               <label className="px-3.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 text-xs font-medium cursor-pointer flex items-center gap-2 transition-all">
@@ -545,7 +749,7 @@ export default function AnalyzePage() {
                 <div className="text-center p-6 space-y-2">
                   <div className="text-5xl">🚗🌊</div>
                   <div className="font-bold text-slate-200 text-sm">
-                    Submerged Highway Asset (NH-544 Aluva Bridge)
+                    {imageResult?.filename || "Submerged Highway Asset (NH-544 Aluva Bridge)"}
                   </div>
                   <div className="text-xs text-amber-400">
                     Circulated Claim: &ldquo;Hyderabad Outer Ring Road flooded this morning!&rdquo;
@@ -554,9 +758,25 @@ export default function AnalyzePage() {
               )}
 
               <div className="absolute top-4 left-4 bg-slate-900/90 border border-amber-500/40 p-2.5 rounded-lg text-xs space-y-1">
-                <span className="text-amber-400 font-bold">⚠️ Recycled Outdated Media (6+ Years Old)</span>
+                <span
+                  className={
+                    isImageRecycled
+                      ? 'text-amber-400 font-bold'
+                      : isImageManipulated
+                      ? 'text-rose-400 font-bold'
+                      : 'text-emerald-400 font-bold'
+                  }
+                >
+                  {isImageRecycled
+                    ? '⚠️ Recycled Outdated Media (6+ Years Old)'
+                    : isImageManipulated
+                    ? '🚫 Synthetic/Manipulated Image'
+                    : '✅ Authentic Camera Photography'}
+                </span>
                 <div className="text-slate-300 text-[11px]">
-                  Original: {imageResult?.reverse_archive_match?.original_event || "Kerala Floods, August 16, 2018"}
+                  {isImageRecycled
+                    ? `Original: ${imageResult?.reverse_archive_match?.original_event || 'Kerala Floods, August 16, 2018'}`
+                    : `Dimensions: ${imageResult?.dimensions || '1280x720'}`}
                 </div>
               </div>
             </div>
@@ -567,23 +787,26 @@ export default function AnalyzePage() {
                 disabled={isLoadingDetection}
                 className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-2"
               >
-                {isLoadingDetection ? '🔄 Running OpenCV ELA...' : '⚡ Re-Run Python OpenCV ELA Scan'}
+                {isLoadingDetection ? '🔄 Running OpenCV ELA...' : '⚡ Re-Run PyTorch MobileNet & ELA'}
               </button>
               <span className="text-xs text-slate-400">Backend API: /api/detect/image</span>
             </div>
 
             <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
-              <span className="font-bold text-slate-200 text-xs">How this deception works:</span>
+              <span className="font-bold text-slate-200 text-xs">Forensic Findings:</span>
               <p className="text-xs text-slate-300 leading-relaxed">
                 {imageResult?.human_summary ||
-                  "The image itself is a genuine photograph—no AI pixels were created. However, it was captured 6 years ago in Kerala and falsely relabeled as taking place in Hyderabad today. Reverse visual indexing matched this image to national archives in under 40 milliseconds."}
+                  "The image is evaluated for compression Error Level Analysis (ELA) divergence across quadrants, Fourier spectrum power law, and perceptual hashing against historical disaster archives."}
               </p>
             </div>
+
+            {/* RAG Workout Card */}
+            <RenderRagCard rag={imageResult?.rag_workout} />
           </div>
 
           <div className="p-6 rounded-2xl glass-panel space-y-5 text-center">
             <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Context Authenticity
+              Visual Authenticity
             </div>
 
             <div className="relative w-36 h-36 mx-auto flex items-center justify-center">
@@ -593,44 +816,96 @@ export default function AnalyzePage() {
                   cx="50"
                   cy="50"
                   r="40"
-                  className="stroke-amber-400"
+                  className={`transition-all duration-1000 ease-out ${
+                    isImageRecycled
+                      ? 'stroke-amber-400'
+                      : isImageManipulated
+                      ? 'stroke-rose-500'
+                      : 'stroke-emerald-400'
+                  }`}
                   strokeWidth="8"
                   strokeDasharray={251.2}
-                  strokeDashoffset={251.2 * (1 - 0.995)}
+                  strokeDashoffset={
+                    251.2 *
+                    (1 -
+                      (isImageRecycled
+                        ? 0.995
+                        : (imageResult?.deepfake_probability || 14.2) / 100))
+                  }
                   strokeLinecap="round"
                   fill="transparent"
                 />
               </svg>
               <div className="absolute flex flex-col items-center">
-                <span className="text-3xl font-extrabold text-white">99.5%</span>
-                <span className="text-[10px] font-medium text-amber-400 uppercase tracking-wider">
-                  Outdated
+                <span className="text-3xl font-extrabold text-white">
+                  {isImageRecycled
+                    ? '99.5%'
+                    : `${imageResult?.authenticity_score || 85.8}%`}
+                </span>
+                <span
+                  className={`text-[10px] font-medium uppercase tracking-wider ${
+                    isImageRecycled
+                      ? 'text-amber-400'
+                      : isImageManipulated
+                      ? 'text-rose-400'
+                      : 'text-emerald-400'
+                  }`}
+                >
+                  {isImageRecycled ? 'Outdated' : isImageManipulated ? 'Synthetic' : 'Authentic'}
                 </span>
               </div>
             </div>
 
             <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold">
-                <span>⚠️</span>
-                <span>Contextual Hijack</span>
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                  isImageRecycled
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                    : isImageManipulated
+                    ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                    : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                }`}
+              >
+                <span>{isImageRecycled ? '⚠️' : isImageManipulated ? '🚫' : '✅'}</span>
+                <span>
+                  {isImageRecycled
+                    ? 'Contextual Hijack'
+                    : isImageManipulated
+                    ? 'Manipulated Composite'
+                    : 'Verified Authentic'}
+                </span>
               </div>
               <p className="text-xs text-slate-400">
-                Actual raw pixels are authentic; the caption is fabricated
+                {isImageRecycled
+                  ? 'Actual raw pixels are authentic; the caption is fabricated'
+                  : isImageManipulated
+                  ? 'Digital pixel alterations or generative synthesis detected'
+                  : 'No tampering or historical reuse found'}
               </p>
             </div>
 
             <div className="space-y-2 text-left border-t border-slate-800/80 pt-4 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-400">Original Date:</span>
-                <span className="font-semibold text-amber-400">16-Aug-2018</span>
+                <span className="text-slate-400">pHash 64-bit DCT:</span>
+                <span className="font-mono text-sky-400 text-[11px]">
+                  {imageResult?.perceptual_hash || 'a1b2c3d4e5f60718'}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">True Location:</span>
-                <span className="font-semibold text-slate-200">Aluva, Kerala</span>
+                <span className="text-slate-400">ELA Anomaly Ratio:</span>
+                <span className="font-semibold text-slate-200">
+                  {imageResult?.error_level_analysis?.ela_anomaly_ratio || 0.08}
+                </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Hyderabad Highway:</span>
-                <span className="font-semibold text-emerald-400">Dry & Clear</span>
+                <span className="text-slate-400">Archival Reuse:</span>
+                <span
+                  className={`font-semibold ${
+                    isImageRecycled ? 'text-amber-400' : 'text-emerald-400'
+                  }`}
+                >
+                  {isImageRecycled ? 'Matched 2018 Archive' : 'None Detected'}
+                </span>
               </div>
             </div>
           </div>
